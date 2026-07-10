@@ -1,8 +1,6 @@
 # Gemini WPF Client
 
-```markdown
-![Screen aplikacji](https://raw.githubusercontent.com/chandlerbing82DE/Gemini-Chat-/main/screenshot.png)
-```
+<img width="1036" height="713" alt="screenshot" src="https://github.com/user-attachments/assets/cb906794-8c68-4c11-b8f6-a2e3079e133a" />
 
 [PL] Nowoczesna aplikacja desktopowa dla systemu Windows (WPF), będąca zaawansowanym klientem dla modeli sztucznej inteligencji **Google Gemini** oraz generatora grafiki **Imagen**. Program oferuje płynne konwersacje tekstowe, analizę załączników (multimodalność) oraz lokalne zarządzanie historią czatów.
 
