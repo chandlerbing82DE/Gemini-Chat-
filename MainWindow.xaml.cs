@@ -42,6 +42,10 @@ namespace Gemini_WPF
 
                 await WebChatView.EnsureCoreWebView2Async(null);
                 _isWebViewInitialized = true;
+                
+                // ZROBIONE: Obsługa wiadomości zwracanych przez przyciski z HTML
+                WebChatView.WebMessageReceived += WebChatView_WebMessageReceived;
+                
                 InitializeWebViewHtml();
 
                 LoadSettings();
@@ -91,8 +95,14 @@ namespace Gemini_WPF
                     code { background-color: #3e3e42; color: #f48fb1; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 13px; }
                     img { max-width: 100%; border-radius: 6px; margin-top: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.4); }
                     .attachment-badge { display: inline-block; background-color: #333337; border: 1px solid #555555; border-radius: 4px; padding: 4px 8px; margin-top: 5px; font-size: 12px; color: #e0e0e0; }
+                    .actions { text-align: right; margin-top: 10px; padding-top: 5px; border-top: 1px solid rgba(255,255,255,0.1); }
+                    .action-btn { background: transparent; color: #9cdcfe; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-left: 5px; font-weight: bold; }
+                    .action-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
                 </style>
                 <script>
+                    function handleAction(actionType, textBytes) {
+                        window.chrome.webview.postMessage(JSON.stringify({ action: actionType, textBytes: textBytes }));
+                    }
                     function appendMessage(className, htmlContent) {
                         var div = document.createElement('div');
                         div.className = className;
@@ -223,6 +233,9 @@ namespace Gemini_WPF
                 parts.Add(new TextData { Text = userMessage });
             }
 
+            string base64UserMsg = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(userMessage));
+            userChatVisualInfo += $"<div class='actions'><button class='action-btn' onclick=\"handleAction('edit', '{base64UserMsg}')\">✏️ Edytuj</button><button class='action-btn' onclick=\"handleAction('retry', '{base64UserMsg}')\">🔄 Ponów</button></div>";
+
             await AppendMessageToWebViewAsync("user", userChatVisualInfo);
             ClearAttachmentList();
             await ShowThinkingIndicatorAsync(true);
@@ -347,7 +360,11 @@ namespace Gemini_WPF
 
                     if (string.IsNullOrWhiteSpace(renderedAiHtml)) renderedAiHtml = "<em>(Brak tekstu ani obrazka z API)</em>";
 
+                    string base64AiMsg = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(responseText));
+                    
                     string aiChatVisualInfo = $"<strong>[{selectedModel}]:</strong><br/>{renderedAiHtml}";
+                    aiChatVisualInfo += $"<div class='actions'><button class='action-btn' onclick=\"handleAction('copy', '{base64AiMsg}')\">📋 Kopiuj</button></div>";
+                    
                     await AppendMessageToWebViewAsync("ai", aiChatVisualInfo);
 
                     bool isNewSession = (_activeSession == null);
@@ -462,7 +479,6 @@ namespace Gemini_WPF
 
                 foreach (var att in msg.Attachments)
                 {
-                    // Fallback-Prüfung: Falls in einem alten Chat der Quellcode falsch zugeordnet wurde 
                     bool isText = att.MimeType == "text/plain" || (att.Base64Data != null && att.Base64Data.Contains("--- Plik:"));
 
                     if (isText && !string.IsNullOrEmpty(att.Base64Data))
@@ -471,7 +487,15 @@ namespace Gemini_WPF
                     }
                     else if (att.MimeType != null && att.Base64Data != null)
                     {
-                        parts.Add(new InlineData { MimeType = att.MimeType, Data = att.Base64Data });
+                        // KORREKTUR: Usuwamy błędny prefiks "data:...;base64," jeśli istnieje w historii!
+                        string cleanBase64 = att.Base64Data;
+                        int prefixIndex = cleanBase64.IndexOf("base64,");
+                        if (prefixIndex >= 0)
+                        {
+                            cleanBase64 = cleanBase64.Substring(prefixIndex + 7);
+                        }
+
+                        parts.Add(new InlineData { MimeType = att.MimeType, Data = cleanBase64 });
                     }
                 }
                 if (!string.IsNullOrEmpty(msg.Text))
@@ -673,6 +697,36 @@ namespace Gemini_WPF
         {
             _selectedFilePaths.Clear();
             UpdateAttachmentsUI();
+        }
+
+        // NOWA METODA: Czeka na kliknięcia użytkownika w podglądzie HTML
+        private async void WebChatView_WebMessageReceived(object sender, CoreWebView2WebMessageReceivedEventArgs e)
+        {
+            try
+            {
+                string json = e.TryGetWebMessageAsString();
+                using JsonDocument doc = JsonDocument.Parse(json);
+                string action = doc.RootElement.GetProperty("action").GetString() ?? "";
+                string base64Text = doc.RootElement.GetProperty("textBytes").GetString() ?? "";
+                
+                string decodedText = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(base64Text));
+
+                switch (action)
+                {
+                    case "copy":
+                        Clipboard.SetText(decodedText);
+                        break;
+                    case "edit":
+                        TxtInput.Text = decodedText;
+                        TxtInput.Focus();
+                        break;
+                    case "retry":
+                        TxtInput.Text = decodedText;
+                        BtnSend_Click(this, null!);
+                        break;
+                }
+            }
+            catch { }
         }
     }
 }
