@@ -1,3 +1,6 @@
+<img width="1031" height="837" alt="screenshot_gemini" src="https://github.com/user-attachments/assets/ab543633-da83-4bf5-9a1e-71b8002440ee" />
+
+
 # Gemini WPF Client
 
 [PL] Nowoczesna aplikacja desktopowa dla systemu Windows (WPF), będąca zaawansowanym klientem dla modeli sztucznej inteligencji Google Gemini oraz generatora grafiki Imagen. Program oferuje płynne konwersacje tekstowe, zaawansowaną analizę załączników, wklejanie obrazów ze schowka ze smart-kompresją, monitoring kosztów zapytań w czasie rzeczywistym oraz lokalne zarządzanie historią czatów.
